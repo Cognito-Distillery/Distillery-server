@@ -1,1 +1,1 @@
-export { searchRoutes } from "./search.controller";
+export { searchRoutes } from "./routes";

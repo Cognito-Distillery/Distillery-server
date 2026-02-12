@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { keywordSearch, naturalSearch } from "./search.service";
+import { keywordSearch, naturalSearch } from "./service";
 
 const KeywordQuery = t.Object({
   q: t.String(),

@@ -1,5 +1,5 @@
 import { driver } from "../graph";
-import { classifyQuery, generateCypher } from "./cypher.generator";
+import { classifyQuery, generateCypher } from "./cypher";
 import { generateEmbedding } from "../distill/embedding";
 import { findSimilarByEmbedding } from "../db/similarity";
 import { logger } from "../logger";

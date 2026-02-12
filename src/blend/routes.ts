@@ -7,7 +7,7 @@ import {
   UpdateEdgeBody,
   DeleteEdgeBody,
   UpdateNodeBody,
-} from "./blend.schema";
+} from "./schema";
 import {
   getGraph,
   getNodeWithNeighbors,
@@ -16,7 +16,7 @@ import {
   updateEdge,
   deleteEdge,
   updateNode,
-} from "./blend.service";
+} from "./service";
 
 export const blendRoutes = new Elysia({ prefix: "/graph" })
 

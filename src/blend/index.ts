@@ -1,1 +1,1 @@
-export { blendRoutes } from "./blend.controller";
+export { blendRoutes } from "./routes";
