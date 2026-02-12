@@ -68,6 +68,41 @@ export function findSimilarInBatch(
   return pairs;
 }
 
+export type SimilarMatch = {
+  id: string;
+  similarity: number;
+};
+
+/**
+ * pgvector 코사인 유사도 검색: sourceId 없이 순수 임베딩 벡터로 CASKED 몰트 검색
+ */
+export async function findSimilarByEmbedding(
+  embedding: number[],
+  limit = 10
+): Promise<SimilarMatch[]> {
+  const distance = cosineDistance(malts.embedding, embedding);
+
+  const results = await db
+    .select({
+      id: malts.id,
+      distance: sql<number>`${distance}`.as("distance"),
+    })
+    .from(malts)
+    .where(
+      and(
+        eq(malts.status, "CASKED"),
+        lte(distance, 0.25)
+      )
+    )
+    .orderBy(sql`${distance}`)
+    .limit(limit);
+
+  return results.map((r) => ({
+    id: r.id,
+    similarity: 1 - r.distance,
+  }));
+}
+
 function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0;
   let normA = 0;
