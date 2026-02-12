@@ -16,21 +16,15 @@ export const refreshJwt = jwt({
 
 export const authGuard = new Elysia()
   .use(accessJwt)
-  .onBeforeHandle(async ({ accessJwt, headers, set }) => {
-    const lang = headers["accept-language"];
+  .derive(async ({ accessJwt, headers }) => {
     const auth = headers.authorization;
     if (!auth?.startsWith("Bearer ")) {
-      set.status = 401;
-      return { error: msg("MISSING_TOKEN", lang) };
+      return { user: null };
     }
     const payload = await accessJwt.verify(auth.slice(7));
     if (!payload) {
-      set.status = 401;
-      return { error: msg("INVALID_TOKEN", lang) };
+      return { user: null };
     }
-  })
-  .resolve(async ({ accessJwt, headers }) => {
-    const payload = await accessJwt.verify(headers.authorization!.slice(7));
     return {
       user: payload as typeof payload & {
         sub: string;
@@ -39,4 +33,12 @@ export const authGuard = new Elysia()
         email: string;
       },
     };
-  });
+  })
+  .onBeforeHandle(({ user, set, headers }) => {
+    if (!user) {
+      const lang = headers["accept-language"];
+      set.status = 401;
+      return { error: msg("MISSING_TOKEN", lang) };
+    }
+  })
+  .as("plugin");
