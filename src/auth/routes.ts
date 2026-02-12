@@ -37,7 +37,10 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
 
       return { message: msg("OTP_SENT", lang) };
     },
-    { body: t.Object({ email: t.String({ format: "email" }) }) }
+    {
+      body: t.Object({ email: t.String({ format: "email" }) }),
+      detail: { tags: ["Auth"], summary: "OTP 발송" },
+    }
   )
 
   .post(
@@ -77,6 +80,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
         email: t.String({ format: "email" }),
         otp: t.String(),
       }),
+      detail: { tags: ["Auth"], summary: "OTP 검증 / 토큰 발급" },
     }
   )
 
@@ -107,5 +111,8 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
 
       return { accessToken, refreshToken: newRefreshToken };
     },
-    { body: t.Object({ refreshToken: t.String() }) }
+    {
+      body: t.Object({ refreshToken: t.String() }),
+      detail: { tags: ["Auth"], summary: "토큰 갱신" },
+    }
   );

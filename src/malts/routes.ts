@@ -112,7 +112,10 @@ export const maltRoutes = new Elysia({ prefix: "/malts" })
       set.status = 201;
       return queued;
     },
-    { body: queueMaltPayload }
+    {
+      body: queueMaltPayload,
+      detail: { tags: ["Malts"], summary: "몰트 등록 (단건)" },
+    }
   )
 
   // 증류 대기열 추가 (일괄)
@@ -133,7 +136,10 @@ export const maltRoutes = new Elysia({ prefix: "/malts" })
       set.status = 201;
       return { malts: queuedMalts };
     },
-    { body: t.Object({ malts: t.Array(queueMaltPayload) }) }
+    {
+      body: t.Object({ malts: t.Array(queueMaltPayload) }),
+      detail: { tags: ["Malts"], summary: "몰트 등록 (일괄)" },
+    }
   )
 
   // 드로우백
@@ -164,7 +170,10 @@ export const maltRoutes = new Elysia({ prefix: "/malts" })
 
       return drawnBack;
     },
-    { params: t.Object({ maltId: t.String() }) }
+    {
+      params: t.Object({ maltId: t.String() }),
+      detail: { tags: ["Malts"], summary: "몰트 드로우백" },
+    }
   )
 
   // 몰트 조회 (status 필터)
@@ -194,5 +203,8 @@ export const maltRoutes = new Elysia({ prefix: "/malts" })
 
       return { malts: result };
     },
-    { query: t.Object({ status: t.Optional(MaltStatus) }) }
+    {
+      query: t.Object({ status: t.Optional(MaltStatus) }),
+      detail: { tags: ["Malts"], summary: "몰트 조회" },
+    }
   );

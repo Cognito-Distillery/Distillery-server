@@ -12,5 +12,13 @@ export const searchRoutes = new Elysia({ prefix: "/search" })
     async ({ query }) => {
       return keywordSearch(query.q, query.limit);
     },
-    { query: KeywordQuery }
+    {
+      query: KeywordQuery,
+      detail: {
+        tags: ["Search"],
+        summary: "키워드 검색",
+        description:
+          "Neo4j full-text index를 사용하여 summary, context, memo 필드에서 키워드 검색합니다.",
+      },
+    }
   );

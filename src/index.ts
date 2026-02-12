@@ -1,4 +1,6 @@
 import { Elysia } from "elysia";
+import { openapi } from "@elysiajs/openapi";
+import { cors } from "@elysiajs/cors";
 import { logger } from "./logger";
 import { authRoutes } from "./auth";
 import { maltRoutes } from "./malts";
@@ -8,6 +10,50 @@ import { cronPlugin } from "./cron";
 import { initGraphSchema } from "./graph/schema";
 
 const app = new Elysia()
+  .use(cors({ origin: /^https?:\/\/localhost(:\d+)?$/ }))
+  .use(
+    openapi({
+      path: "/docs",
+      scalar: {
+        theme: "moon",
+        hideClientButton: false,
+        showSidebar: true,
+        showDeveloperTools: "localhost",
+        showToolbar: "localhost",
+        operationTitleSource: "summary",
+        persistAuth: false,
+        telemetry: true,
+        layout: "modern",
+        isEditable: false,
+        isLoading: false,
+        hideModels: false,
+        documentDownloadType: "both",
+        hideTestRequestButton: false,
+        hideSearch: false,
+        showOperationId: false,
+        hideDarkModeToggle: false,
+        withDefaultFonts: true,
+        defaultOpenAllTags: false,
+        expandAllModelSections: false,
+        expandAllResponses: false,
+        orderSchemaPropertiesBy: "alpha",
+        orderRequiredPropertiesFirst: true,
+      },
+      documentation: {
+        info: {
+          title: "Distillery API",
+          description: "Blending Room — Knowledge Graph API Server",
+          version: "1.0.0",
+        },
+        tags: [
+          { name: "Graph", description: "그래프 조회/편집" },
+          { name: "Search", description: "키워드 검색" },
+          { name: "Malts", description: "몰트 관리" },
+          { name: "Auth", description: "인증 (OTP / JWT)" },
+        ],
+      },
+    })
+  )
   .onRequest(({ store, request }) => {
     const s = store as Record<string, unknown>;
     s.requestId = crypto.randomUUID();
