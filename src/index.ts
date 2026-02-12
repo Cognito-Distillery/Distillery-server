@@ -2,6 +2,8 @@ import { Elysia } from "elysia";
 import { logger } from "./logger";
 import { authRoutes } from "./auth";
 import { maltRoutes } from "./malts";
+import { blendRoutes } from "./blend";
+import { searchRoutes } from "./search";
 import { cronPlugin } from "./cron";
 import { initGraphSchema } from "./graph/schema";
 
@@ -39,6 +41,8 @@ const app = new Elysia()
   .use(cronPlugin)
   .use(authRoutes)
   .use(maltRoutes)
+  .use(blendRoutes)
+  .use(searchRoutes)
   .get("/", () => "Hello Elysia")
   .listen(3000);
 

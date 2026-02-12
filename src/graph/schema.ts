@@ -23,6 +23,9 @@ export async function initGraphSchema() {
   await runQuery(
     "CREATE CONSTRAINT knowledge_id_unique IF NOT EXISTS FOR (k:Knowledge) REQUIRE k.id IS UNIQUE"
   );
+  await runQuery(
+    `CREATE FULLTEXT INDEX knowledge_text IF NOT EXISTS FOR (k:Knowledge) ON EACH [k.summary, k.context, k.memo]`
+  );
   logger.info("Graph schema initialized");
 }
 
