@@ -1,0 +1,1 @@
+export { maltRoutes } from "./routes";
