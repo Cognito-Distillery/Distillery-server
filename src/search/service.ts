@@ -41,25 +41,67 @@ export async function keywordSearch(query: string, limit: number = 10) {
     const result = await session.run(
       `CALL db.index.fulltext.queryNodes("knowledge_text", $query)
        YIELD node, score
+       WITH node, score
+       LIMIT $limit
+       OPTIONAL MATCH (node)-[r]-(m:Knowledge)
        RETURN node.id AS id, node.type AS type, node.summary AS summary,
-              node.context AS context, node.memo AS memo, score
-       LIMIT $limit`,
+              node.context AS context, node.memo AS memo, score,
+              type(r) AS relType, r.confidence AS confidence,
+              startNode(r).id AS sourceId, endNode(r).id AS targetId,
+              m.id AS neighborId, m.type AS neighborType,
+              m.summary AS neighborSummary, m.context AS neighborContext,
+              m.memo AS neighborMemo`,
       { query, limit }
     );
 
-    const nodes: NodeRecord[] = result.records.map((r) => {
-      const obj = r.toObject();
-      return {
-        id: obj.id as string,
-        type: obj.type as string,
-        summary: obj.summary as string,
-        context: obj.context as string,
-        memo: obj.memo as string,
-        score: obj.score as number,
-      };
-    });
+    const nodesMap = new Map<string, NodeRecord>();
+    const edges: GraphEdge[] = [];
 
-    return { nodes };
+    for (const record of result.records) {
+      const obj = record.toObject();
+
+      // Add seed node
+      const id = obj.id as string;
+      if (id && !nodesMap.has(id)) {
+        nodesMap.set(id, {
+          id,
+          type: (obj.type as string) ?? "",
+          summary: (obj.summary as string) ?? "",
+          context: (obj.context as string) ?? "",
+          memo: (obj.memo as string) ?? "",
+          score: obj.score as number,
+        });
+      }
+
+      // Add neighbor node
+      const neighborId = obj.neighborId as string | null;
+      if (neighborId && !nodesMap.has(neighborId)) {
+        nodesMap.set(neighborId, {
+          id: neighborId,
+          type: (obj.neighborType as string) ?? "",
+          summary: (obj.neighborSummary as string) ?? "",
+          context: (obj.neighborContext as string) ?? "",
+          memo: (obj.neighborMemo as string) ?? "",
+          score: 0,
+        });
+      }
+
+      // Add edge
+      if (obj.relType && obj.sourceId && obj.targetId) {
+        const conf = obj.confidence;
+        const confValue = conf instanceof Integer
+          ? conf.toNumber()
+          : typeof conf === "number" ? conf : null;
+        edges.push({
+          sourceId: obj.sourceId as string,
+          targetId: obj.targetId as string,
+          relType: obj.relType as string,
+          confidence: confValue,
+        });
+      }
+    }
+
+    return { nodes: [...nodesMap.values()], edges };
   } finally {
     await session.close();
   }
@@ -254,6 +296,6 @@ async function keywordFallback(
       context: n.context,
       memo: n.memo,
     })),
-    edges: [],
+    edges: result.edges,
   };
 }
