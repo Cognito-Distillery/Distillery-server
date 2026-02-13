@@ -8,9 +8,10 @@ import { blendRoutes } from "./blend";
 import { searchRoutes } from "./search";
 import { cronPlugin } from "./cron";
 import { initGraphSchema } from "./graph/schema";
+import { corsOrigins } from "./config";
 
 const app = new Elysia()
-  .use(cors({ origin: /^https?:\/\/localhost(:\d+)?$/ }))
+  .use(cors({ origin: corsOrigins.length ? corsOrigins : true }))
   .use(
     openapi({
       path: "/docs",
@@ -90,7 +91,7 @@ const app = new Elysia()
   .use(blendRoutes)
   .use(searchRoutes)
   .get("/", () => "Hello Elysia")
-  .listen(3000);
+  .listen(Number(process.env.PORT) || 8710);
 
 logger.info(
   `Elysia is running at ${app.server?.hostname}:${app.server?.port}`

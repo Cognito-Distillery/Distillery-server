@@ -1,6 +1,23 @@
 {
   "name": "distillery-server",
-  "version": "1.0.50",
+  "version": "0.1.0",
+  "description": "AI-powered backend that distills scattered thoughts into a connected knowledge graph",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cognito-Distillery/Distillery-server.git"
+  },
+  "homepage": "https://github.com/Cognito-Distillery/Distillery-server#readme",
+  "bugs": "https://github.com/Cognito-Distillery/Distillery-server/issues",
+  "license": "MIT",
+  "author": "Cognito-Distillery",
+  "keywords": [
+    "knowledge-graph",
+    "neo4j",
+    "pgvector",
+    "openai",
+    "bun",
+    "elysia"
+  ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "bun run --watch src/index.ts"
