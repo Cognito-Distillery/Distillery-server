@@ -49,12 +49,12 @@ export async function getGraph(filters: {
   source?: string;
   limit?: number;
 }) {
-  const limit = filters.limit ?? 100;
+  const limit = Math.trunc(filters.limit ?? 100);
   const session = driver.session();
   try {
     // 1) 노드 조회 (고립 노드 포함 보장)
     const nodeResult = await session.run(
-      `MATCH (k:Knowledge) RETURN k.id AS id, k.type AS type, k.summary AS summary, k.context AS context, k.memo AS memo LIMIT $limit`,
+      `MATCH (k:Knowledge) WHERE k.id IS NOT NULL RETURN k.id AS id, COALESCE(k.type, 'unknown') AS type, COALESCE(k.summary, '') AS summary, COALESCE(k.context, '') AS context, COALESCE(k.memo, '') AS memo LIMIT toInteger($limit)`,
       { limit }
     );
     const nodes = nodeResult.records.map((r) => toNode(r.toObject()));
@@ -147,7 +147,7 @@ const expandCyphers: Record<number, string> = {
 };
 
 export async function expandNode(id: string, depth: number) {
-  const clampedDepth = Math.max(1, Math.min(3, depth));
+  const clampedDepth = Math.max(1, Math.min(3, Math.trunc(depth)));
   const session = driver.session();
   try {
     if (clampedDepth === 1) {
@@ -261,39 +261,35 @@ export async function createEdge(
 }
 
 // 단일 트랜잭션으로 DELETE → MERGE
-function updateEdgeCypher(relationType: RelationType): string {
-  switch (relationType) {
-    case "RELATED_TO":
-      return `MERGE (a)-[r2:RELATED_TO]->(b)
-              ON CREATE SET r2.source = 'human', r2.confidence = 1.0, r2.createdAt = datetime(), r2.updatedAt = datetime()
-              ON MATCH SET r2.updatedAt = datetime()
-              RETURN a.id AS sourceId, b.id AS targetId, type(r2) AS relationType,
-                     r2.source AS source, r2.confidence AS confidence,
-                     r2.createdAt AS createdAt, r2.updatedAt AS updatedAt`;
-    case "SUPPORTS":
-      return `MERGE (a)-[r2:SUPPORTS]->(b)
-              ON CREATE SET r2.source = 'human', r2.confidence = 1.0, r2.createdAt = datetime(), r2.updatedAt = datetime()
-              ON MATCH SET r2.updatedAt = datetime()
-              RETURN a.id AS sourceId, b.id AS targetId, type(r2) AS relationType,
-                     r2.source AS source, r2.confidence AS confidence,
-                     r2.createdAt AS createdAt, r2.updatedAt AS updatedAt`;
-    case "CONFLICTS_WITH":
-      return `MERGE (a)-[r2:CONFLICTS_WITH]->(b)
-              ON CREATE SET r2.source = 'human', r2.confidence = 1.0, r2.createdAt = datetime(), r2.updatedAt = datetime()
-              ON MATCH SET r2.updatedAt = datetime()
-              RETURN a.id AS sourceId, b.id AS targetId, type(r2) AS relationType,
-                     r2.source AS source, r2.confidence AS confidence,
-                     r2.createdAt AS createdAt, r2.updatedAt AS updatedAt`;
-  }
+function updateEdgeCypher(relationType: RelationType, hasConfidence: boolean): string {
+  const confidenceCreate = hasConfidence ? "$confidence" : "1.0";
+  const confidenceMatch = hasConfidence ? ", r2.confidence = $confidence" : "";
+  const relMap: Record<RelationType, string> = {
+    RELATED_TO: "RELATED_TO",
+    SUPPORTS: "SUPPORTS",
+    CONFLICTS_WITH: "CONFLICTS_WITH",
+  };
+  const rel = relMap[relationType];
+  return `MERGE (a)-[r2:${rel}]->(b)
+          ON CREATE SET r2.source = 'human', r2.confidence = ${confidenceCreate}, r2.createdAt = datetime(), r2.updatedAt = datetime()
+          ON MATCH SET r2.updatedAt = datetime()${confidenceMatch}
+          RETURN a.id AS sourceId, b.id AS targetId, type(r2) AS relationType,
+                 r2.source AS source, r2.confidence AS confidence,
+                 r2.createdAt AS createdAt, r2.updatedAt AS updatedAt`;
 }
 
 export async function updateEdge(
   sourceId: string,
   targetId: string,
-  relationType: RelationType
+  relationType: RelationType,
+  confidence?: number
 ) {
   const session = driver.session();
   try {
+    const hasConfidence = confidence !== undefined;
+    const params: Record<string, unknown> = { sourceId, targetId };
+    if (hasConfidence) params.confidence = confidence;
+
     const result = await session.executeWrite(async (tx) => {
       // DELETE existing relationship
       await tx.run(
@@ -304,9 +300,9 @@ export async function updateEdge(
       // MERGE new relationship type
       const cypher = `MATCH (a:Knowledge { id: $sourceId })
                       MATCH (b:Knowledge { id: $targetId })
-                      ${updateEdgeCypher(relationType)}`;
+                      ${updateEdgeCypher(relationType, hasConfidence)}`;
 
-      return tx.run(cypher, { sourceId, targetId });
+      return tx.run(cypher, params);
     });
 
     if (result.records.length === 0) return null;

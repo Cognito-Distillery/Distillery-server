@@ -5,6 +5,7 @@ import { runQuery } from "../graph";
 import { RelationType, edgeCypher } from "../graph/schema";
 import { findSimilarCasked, type SimilarPair } from "../db/similarity";
 import { extractRelations, type RelationCandidate } from "./relationship";
+import { getPipelineSettings } from "../pipeline/settings-cache";
 import { logger } from "../logger";
 
 /**
@@ -47,10 +48,11 @@ export async function backfillIsolatedNodes() {
   }
 
   // 3. 유사도 검색 (전체 CASKED 대상)
+  const settings = await getPipelineSettings();
   const allPairs: SimilarPair[] = [];
   for (const malt of withEmbedding) {
     try {
-      const similar = await findSimilarCasked(malt.id, malt.embedding);
+      const similar = await findSimilarCasked(malt.id, malt.embedding, settings.topK, settings.similarityThreshold);
       allPairs.push(...similar);
     } catch (err) {
       logger.warn({ err, maltId: malt.id }, "Backfill: similarity search failed");

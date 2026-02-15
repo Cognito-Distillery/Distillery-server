@@ -20,19 +20,22 @@
  │  수집 &   │──▶│ 임베딩 & │──▶│  관계    │──▶│  연결된  │
  │  대기열   │   │  증류    │   │  탐색    │   │  지식    │
  └──────────┘   └──────────┘   └──────────┘   └──────────┘
-   원본 입력     AI 벡터 변환   GPT 분석       Neo4j 그래프
+   원본 입력     AI 벡터 변환   AI 분석        Neo4j 그래프
 ```
 
 Distillery Server는 **흩어진 생각을 연결된 지식 그래프로 증류하는** 백엔드입니다.
 
 결정, 문제, 인사이트, 질문을 **malt**로 기록하면,
-서버가 벡터로 임베딩하고 GPT로 관계를 발견하여
+서버가 벡터로 임베딩하고 AI로 관계를 발견하여
 **캐스크** — Neo4j 지식 그래프에 숙성시킵니다.
 모든 노드가 제자리를 찾을 때까지.
 
 ---
 
 ## 파이프라인
+
+파이프라인은 설정 가능한 주기(기본값: 30분)로 동적 스케줄러를 통해 실행됩니다.
+설정 페이지에서 수동으로 트리거할 수도 있습니다.
 
 ### 1. Malt House — 수집
 
@@ -49,16 +52,18 @@ REST API로 지식 항목을 등록합니다. 각 malt에 유형을 지정합니
 
 ### 2. Still — 증류
 
-크론 작업이 OpenAI `text-embedding-3-small`로 1536차원 벡터 임베딩을 생성하고
+OpenAI를 통해 1536차원 벡터 임베딩을 생성하고
 상태를 `DISTILLED_READY`에서 `DISTILLED`로 진행시킵니다.
+임베딩 모델은 설정 가능하며(`text-embedding-3-small` 또는 `text-embedding-3-large`),
+일관성을 위해 차원은 1536으로 강제됩니다.
 
 ### 3. Cask — 연결
 
 지식 그래프를 구축합니다:
 
 - Neo4j에 Knowledge 노드 생성
-- pgvector 코사인 유사도로 유사한 malt 탐색 (임계값: 0.75)
-- GPT-4o-mini가 관계를 분류:
+- pgvector 코사인 유사도로 유사한 캐스크 탐색 (설정 가능한 임계값, 기본값: 0.75)
+- AI가 관계를 분류 (프로바이더 설정 가능: OpenAI 또는 Google):
   - `RELATED_TO` — 개념적 연결
   - `SUPPORTS` — 하나가 다른 하나를 뒷받침
   - `CONFLICTS_WITH` — 상충하는 인사이트
@@ -68,11 +73,6 @@ REST API로 지식 항목을 등록합니다. 각 malt에 유형을 지정합니
 
 주간 작업이 고립된 노드를 찾아 전체 그래프에 대해 재평가합니다.
 지식이 영구적으로 단절되지 않도록.
-
-| 작업 | 스케줄 |
-|------|--------|
-| `distill-and-cask` | 매일 00:00, 12:00 |
-| `backfill` | 매주 일요일 03:00 |
 
 ---
 
@@ -116,6 +116,38 @@ REST API로 지식 항목을 등록합니다. 각 malt에 유형을 지정합니
 | `GET` | `/search/keyword` | 풀텍스트 키워드 검색 |
 | `POST` | `/search/natural` | 자연어 검색 (Text-to-Cypher / 임베딩) |
 
+### 설정
+
+| 메서드 | 엔드포인트 | 설명 |
+|--------|-----------|------|
+| `GET` | `/settings/ai` | AI 모델 설정 조회 |
+| `PUT` | `/settings/ai` | AI 모델 설정 변경 |
+| `GET` | `/settings/pipeline` | 파이프라인 설정 조회 |
+| `PUT` | `/settings/pipeline` | 파이프라인 설정 변경 |
+
+### 파이프라인
+
+| 메서드 | 엔드포인트 | 설명 |
+|--------|-----------|------|
+| `POST` | `/pipeline/trigger` | 파이프라인 수동 실행 |
+| `POST` | `/pipeline/re-embed` | 전체 임베딩 재생성 |
+| `POST` | `/pipeline/re-extract` | 전체 관계 재추출 |
+| `GET` | `/pipeline/status` | 파이프라인 현재 상태 |
+
+### 사용자 설정
+
+| 메서드 | 엔드포인트 | 설명 |
+|--------|-----------|------|
+| `GET` | `/preferences` | 사용자 설정 조회 |
+| `PUT` | `/preferences` | 사용자 설정 변경 |
+
+### 검색 기록
+
+| 메서드 | 엔드포인트 | 설명 |
+|--------|-----------|------|
+| `GET` | `/search-history` | 검색 기록 조회 |
+| `DELETE` | `/search-history` | 검색 기록 삭제 |
+
 ---
 
 ## 기술 스택
@@ -124,7 +156,7 @@ REST API로 지식 항목을 등록합니다. 각 malt에 유형을 지정합니
 Server    Bun · Elysia · TypeScript
 Database  PostgreSQL · pgvector · Drizzle ORM
 Graph     Neo4j
-AI        OpenAI (text-embedding-3-small · gpt-4o-mini)
+AI        OpenAI (임베딩) · OpenAI / Google AI (관계 추출)
 Auth      Slack OTP · JWT
 Infra     Docker Compose · Pino · OpenAPI + Scalar
 ```
@@ -173,19 +205,19 @@ cp .env.example .env
 | `JWT_REFRESH_SECRET` | 리프레시 토큰 서명 키 (32자 이상) |
 | `SLACK_BOT_TOKEN` | Slack Bot User OAuth Token (`xoxb-...`) |
 | `DATABASE_URL` | PostgreSQL 연결 문자열 |
-| `OPENAI_API_KEY` | OpenAI API 키 (임베딩 & GPT) |
+| `OPENAI_API_KEY` | OpenAI API 키 (임베딩 & 채팅) |
+| `GOOGLE_AI_API_KEY` | Google AI API 키 (선택사항, 관계 추출용) |
 | `NEO4J_URI` | Neo4j Bolt URI |
 | `NEO4J_USER` | Neo4j 사용자명 |
 | `NEO4J_PASSWORD` | Neo4j 비밀번호 |
 | `PORT` | 서버 포트 (기본값: `8710`) |
 | `LOG_LEVEL` | `debug`, `info`, `warn`, `error` |
-| `ENVIRONMENT` | `development` 또는 `production` |
 
 ### 4. 초기화 및 실행
 
 ```bash
 # 데이터베이스 스키마 적용
-bunx drizzle-kit push
+bun run db:push
 
 # 서버 실행
 bun run dev
@@ -296,18 +328,23 @@ server {
 
 ```
 src/
-├── index.ts          # 앱 진입점 & Elysia 설정
-├── logger.ts         # Pino 구조화 로깅
-├── i18n.ts           # 다국어 지원 (ko, en)
-├── auth/             # Slack OTP + JWT 인증
-├── db/               # Drizzle 스키마, pgvector 유사도 검색
-├── malts/            # Malt CRUD 엔드포인트
-├── distill/          # 임베딩 생성 파이프라인
-├── cask/             # 지식 그래프 관계 추출
-├── blend/            # 그래프 조회 & 편집 API
-├── search/           # 키워드 & 자연어 검색
-├── cron/             # 스케줄링 (증류 & 백필)
-└── graph/            # Neo4j 드라이버 & Cypher queries
+├── index.ts              # 앱 진입점 & Elysia 설정
+├── config.ts             # CORS & 앱 설정
+├── logger.ts             # Pino 구조화 로깅
+├── i18n.ts               # 다국어 지원 (ko, en)
+├── ai/                   # AI 프로바이더 추상화 (OpenAI, Google) & 설정
+├── auth/                 # Slack OTP + JWT 인증
+├── db/                   # Drizzle 스키마, pgvector 유사도 검색
+├── malts/                # Malt CRUD 엔드포인트
+├── distill/              # 임베딩 생성 파이프라인
+├── cask/                 # 지식 그래프 관계 추출
+├── blend/                # 그래프 조회 & 편집 API
+├── search/               # 키워드 & 자연어 검색
+├── search-history/       # 검색 기록 관리
+├── preferences/          # 사용자 설정 API
+├── pipeline/             # 동적 스케줄러, 설정, 진행 상태 추적
+├── cron/                 # 스케줄링 (백필)
+└── graph/                # Neo4j 드라이버 & Cypher queries
 ```
 
 ---

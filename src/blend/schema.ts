@@ -32,6 +32,7 @@ export const UpdateEdgeBody = t.Object({
   sourceId: t.String(),
   targetId: t.String(),
   relationType: RelationTypeSchema,
+  confidence: t.Optional(t.Number({ minimum: 0, maximum: 1 })),
 });
 
 export const DeleteEdgeBody = t.Object({

@@ -1,17 +1,12 @@
-import OpenAI from "openai";
+import { getEmbeddingProvider } from "../ai";
 import { logger } from "../logger";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function generateEmbeddings(
   texts: string[]
 ): Promise<(number[] | null)[]> {
   try {
-    const response = await openai.embeddings.create({
-      model: "text-embedding-3-small",
-      input: texts,
-    });
-    return response.data.map((d) => d.embedding);
+    const provider = await getEmbeddingProvider();
+    return provider.generateEmbeddings(texts);
   } catch (err) {
     logger.warn({ err }, "Failed to generate embeddings, returning nulls");
     return texts.map(() => null);

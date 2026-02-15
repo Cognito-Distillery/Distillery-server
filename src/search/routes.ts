@@ -8,6 +8,8 @@ const KeywordQuery = t.Object({
 
 const NaturalQuery = t.Object({
   query: t.String(),
+  threshold: t.Optional(t.Number({ minimum: 0.1, maximum: 0.95 })),
+  topK: t.Optional(t.Number({ minimum: 1, maximum: 50 })),
 });
 
 export const searchRoutes = new Elysia({ prefix: "/search" })
@@ -29,7 +31,10 @@ export const searchRoutes = new Elysia({ prefix: "/search" })
   .post(
     "/natural",
     async ({ body }) => {
-      return naturalSearch(body.query);
+      return naturalSearch(body.query, {
+        threshold: body.threshold,
+        topK: body.topK,
+      });
     },
     {
       body: NaturalQuery,

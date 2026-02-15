@@ -16,8 +16,10 @@ export type SimilarPair = {
 export async function findSimilarCasked(
   sourceId: string,
   embedding: number[],
-  limit = 5
+  limit = 5,
+  threshold = 0.75
 ): Promise<SimilarPair[]> {
+  const maxDistance = 1 - threshold;
   const distance = cosineDistance(malts.embedding, embedding);
 
   const results = await db
@@ -30,7 +32,7 @@ export async function findSimilarCasked(
       and(
         eq(malts.status, "CASKED"),
         ne(malts.id, sourceId),
-        lte(distance, 0.25) // cosine distance <= 0.25 = similarity >= 0.75
+        lte(distance, maxDistance)
       )
     )
     .orderBy(sql`${distance}`)
@@ -48,14 +50,15 @@ export async function findSimilarCasked(
  * N*(N-1)/2 쌍, threshold >= 0.75
  */
 export function findSimilarInBatch(
-  items: { id: string; embedding: number[] }[]
+  items: { id: string; embedding: number[] }[],
+  threshold = 0.75
 ): SimilarPair[] {
   const pairs: SimilarPair[] = [];
 
   for (let i = 0; i < items.length; i++) {
     for (let j = i + 1; j < items.length; j++) {
       const sim = cosineSimilarity(items[i].embedding, items[j].embedding);
-      if (sim >= 0.75) {
+      if (sim >= threshold) {
         pairs.push({
           sourceId: items[i].id,
           targetId: items[j].id,
@@ -78,8 +81,10 @@ export type SimilarMatch = {
  */
 export async function findSimilarByEmbedding(
   embedding: number[],
-  limit = 10
+  limit = 10,
+  threshold = 0.75
 ): Promise<SimilarMatch[]> {
+  const maxDistance = 1 - threshold;
   const distance = cosineDistance(malts.embedding, embedding);
 
   const results = await db
@@ -91,7 +96,7 @@ export async function findSimilarByEmbedding(
     .where(
       and(
         eq(malts.status, "CASKED"),
-        lte(distance, 0.25)
+        lte(distance, maxDistance)
       )
     )
     .orderBy(sql`${distance}`)

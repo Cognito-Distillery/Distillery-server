@@ -114,7 +114,7 @@ export const blendRoutes = new Elysia({ prefix: "/graph" })
   .put(
     "/edge",
     async ({ body, set }) => {
-      const result = await updateEdge(body.sourceId, body.targetId, body.relationType);
+      const result = await updateEdge(body.sourceId, body.targetId, body.relationType, body.confidence);
       if (!result) {
         set.status = 404;
         return { error: "Edge not found" };

@@ -51,7 +51,7 @@ export async function keywordSearch(query: string, limit: number = 10) {
               m.id AS neighborId, m.type AS neighborType,
               m.summary AS neighborSummary, m.context AS neighborContext,
               m.memo AS neighborMemo`,
-      { query, limit }
+      { query, limit: Integer.fromNumber(limit) }
     );
 
     const nodesMap = new Map<string, NodeRecord>();
@@ -108,7 +108,8 @@ export async function keywordSearch(query: string, limit: number = 10) {
 }
 
 export async function naturalSearch(
-  query: string
+  query: string,
+  options?: { threshold?: number; topK?: number }
 ): Promise<NaturalSearchResult> {
   let queryType: "structural" | "exploratory";
 
@@ -124,7 +125,7 @@ export async function naturalSearch(
     return structuralSearch(query);
   }
 
-  return exploratorySearch(query);
+  return exploratorySearch(query, options);
 }
 
 async function structuralSearch(
@@ -190,7 +191,8 @@ async function structuralSearch(
 }
 
 async function exploratorySearch(
-  query: string
+  query: string,
+  options?: { threshold?: number; topK?: number }
 ): Promise<NaturalSearchResult> {
   let embedding: number[] | null;
   try {
@@ -204,7 +206,9 @@ async function exploratorySearch(
     return keywordFallback(query);
   }
 
-  const similar = await findSimilarByEmbedding(embedding, 5);
+  const topK = options?.topK ?? 5;
+  const threshold = options?.threshold ?? 0.75;
+  const similar = await findSimilarByEmbedding(embedding, topK, threshold);
   if (similar.length === 0) {
     return keywordFallback(query);
   }

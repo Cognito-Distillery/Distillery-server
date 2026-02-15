@@ -1,8 +1,6 @@
-import OpenAI from "openai";
+import { getChatProvider } from "../ai";
 import { RelationType } from "../graph/schema";
 import { logger } from "../logger";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export type RelationCandidate = {
   sourceId: string;
@@ -28,7 +26,7 @@ type AIResponse = {
 };
 
 /**
- * OpenAI gpt-4o-mini로 관계 추출
+ * AI로 관계 추출
  * 후보들을 5개씩 배치로 묶어 호출
  */
 export async function extractRelations(
@@ -65,10 +63,12 @@ async function extractBatch(
     targetSummary: c.targetSummary,
   }));
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const { provider, model } = await getChatProvider();
+
+  const content = await provider.chatCompletion({
+    model,
     temperature: 0.1,
-    response_format: { type: "json_object" },
+    responseFormat: "json",
     messages: [
       {
         role: "system",
@@ -82,7 +82,7 @@ For each pair, determine the relationship type:
 
 Return JSON: { "relations": [{ "sourceId": string, "targetId": string, "relation": string | null, "confidence": number (0.0-1.0) }] }
 
-Be conservative — only assign a relation when clearly justified. Prefer null over weak RELATED_TO.`,
+Assign a relation when there is a reasonable topical connection. Use RELATED_TO for general thematic links. Only return null when there is truly no connection.`,
       },
       {
         role: "user",
@@ -91,7 +91,6 @@ Be conservative — only assign a relation when clearly justified. Prefer null o
     ],
   });
 
-  const content = response.choices[0]?.message?.content;
   if (!content) return [];
 
   const parsed: AIResponse = JSON.parse(content);

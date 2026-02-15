@@ -20,13 +20,19 @@
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts"
+    "dev": "bun run --watch src/index.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:pull": "drizzle-kit pull",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.1",
     "@elysiajs/cron": "^1.4.1",
     "@elysiajs/jwt": "^1.4.0",
     "@elysiajs/openapi": "^1.4.14",
+    "@google/genai": "^1.41.0",
     "@slack/web-api": "^7.14.0",
     "drizzle-orm": "^0.45.1",
     "elysia": "latest",

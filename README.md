@@ -20,19 +20,22 @@
  │  Queue &  │──▶│ Embed &  │──▶│ Discover │──▶│ Connected│
  │  Collect  │   │ Distill  │   │ Relations│   │ Knowledge│
  └──────────┘   └──────────┘   └──────────┘   └──────────┘
-   raw input     AI embedding   GPT analysis    Neo4j graph
+   raw input     AI embedding   AI analysis     Neo4j graph
 ```
 
 Distillery Server is the backend that **distills scattered thoughts into a connected knowledge graph**.
 
 Users capture decisions, problems, insights, and questions as **malts**.
-The server embeds them into vectors, discovers relationships via GPT,
+The server embeds them into vectors, discovers relationships via AI,
 and ages them in the **cask** — a Neo4j knowledge graph
 where every node finds its place.
 
 ---
 
 ## The Pipeline
+
+The pipeline runs on a configurable interval (default: every 30 minutes)
+with a dynamic scheduler. It can also be triggered manually from the settings page.
 
 ### 1. Malt House — Collect
 
@@ -49,16 +52,18 @@ Status flow: `MALT_HOUSE` → `DISTILLED_READY` → `DISTILLED` → `CASKED`
 
 ### 2. Still — Distill
 
-A cron job generates 1536-dim vector embeddings via OpenAI `text-embedding-3-small`
-and advances status from `DISTILLED_READY` to `DISTILLED`.
+Generate 1536-dim vector embeddings via OpenAI
+and advance status from `DISTILLED_READY` to `DISTILLED`.
+The embedding model is configurable (`text-embedding-3-small` or `text-embedding-3-large`),
+with dimensions forced to 1536 for consistency.
 
 ### 3. Cask — Connect
 
 Build the knowledge graph:
 
 - Create Knowledge nodes in Neo4j
-- Find similar malts using pgvector cosine similarity (threshold: 0.75)
-- GPT-4o-mini classifies relationships:
+- Find similar casks using pgvector cosine similarity (configurable threshold, default: 0.75)
+- AI classifies relationships (provider configurable: OpenAI or Google):
   - `RELATED_TO` — conceptual connection
   - `SUPPORTS` — one reinforces another
   - `CONFLICTS_WITH` — contradictory insights
@@ -68,11 +73,6 @@ Build the knowledge graph:
 
 A weekly job finds isolated nodes and re-evaluates them against the full graph,
 so no knowledge stays permanently disconnected.
-
-| Job | Schedule |
-|-----|----------|
-| `distill-and-cask` | Every day at 00:00 and 12:00 |
-| `backfill` | Every Sunday at 03:00 |
 
 ---
 
@@ -116,6 +116,38 @@ Interactive documentation available at `/docs` (Scalar UI).
 | `GET` | `/search/keyword` | Full-text keyword search |
 | `POST` | `/search/natural` | Natural language search (Text-to-Cypher / embedding) |
 
+### Settings
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/settings/ai` | Get AI model settings |
+| `PUT` | `/settings/ai` | Update AI model settings |
+| `GET` | `/settings/pipeline` | Get pipeline settings |
+| `PUT` | `/settings/pipeline` | Update pipeline settings |
+
+### Pipeline
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/pipeline/trigger` | Manually trigger the pipeline |
+| `POST` | `/pipeline/re-embed` | Re-generate all embeddings |
+| `POST` | `/pipeline/re-extract` | Re-extract all relationships |
+| `GET` | `/pipeline/status` | Current pipeline status |
+
+### Preferences
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/preferences` | Get user preferences |
+| `PUT` | `/preferences` | Update user preferences |
+
+### Search History
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/search-history` | Get search history |
+| `DELETE` | `/search-history` | Clear search history |
+
 ---
 
 ## Tech Stack
@@ -124,7 +156,7 @@ Interactive documentation available at `/docs` (Scalar UI).
 Server    Bun · Elysia · TypeScript
 Database  PostgreSQL · pgvector · Drizzle ORM
 Graph     Neo4j
-AI        OpenAI (text-embedding-3-small · gpt-4o-mini)
+AI        OpenAI (embedding) · OpenAI / Google AI (relation extraction)
 Auth      Slack OTP · JWT
 Infra     Docker Compose · Pino · OpenAPI + Scalar
 ```
@@ -173,19 +205,19 @@ cp .env.example .env
 | `JWT_REFRESH_SECRET` | Refresh token signing key (32+ chars) |
 | `SLACK_BOT_TOKEN` | Slack Bot User OAuth Token (`xoxb-...`) |
 | `DATABASE_URL` | PostgreSQL connection string |
-| `OPENAI_API_KEY` | OpenAI API key for embeddings & GPT |
+| `OPENAI_API_KEY` | OpenAI API key for embeddings & chat |
+| `GOOGLE_AI_API_KEY` | Google AI API key (optional, for relation extraction) |
 | `NEO4J_URI` | Neo4j Bolt URI |
 | `NEO4J_USER` | Neo4j username |
 | `NEO4J_PASSWORD` | Neo4j password |
 | `PORT` | Server port (default: `8710`) |
 | `LOG_LEVEL` | `debug`, `info`, `warn`, `error` |
-| `ENVIRONMENT` | `development` or `production` |
 
 ### 4. Initialize and run
 
 ```bash
 # Push database schema
-bunx drizzle-kit push
+bun run db:push
 
 # Start server
 bun run dev
@@ -296,18 +328,23 @@ server {
 
 ```
 src/
-├── index.ts          # App entry point & Elysia setup
-├── logger.ts         # Pino structured logging
-├── i18n.ts           # Internationalization (ko, en)
-├── auth/             # Slack OTP + JWT authentication
-├── db/               # Drizzle schema, pgvector similarity
-├── malts/            # Malt CRUD endpoints
-├── distill/          # Embedding generation pipeline
-├── cask/             # Knowledge graph relationship extraction
-├── blend/            # Graph query & editing API
-├── search/           # Keyword & natural language search
-├── cron/             # Scheduled distill & backfill jobs
-└── graph/            # Neo4j driver & Cypher queries
+├── index.ts              # App entry point & Elysia setup
+├── config.ts             # CORS & app configuration
+├── logger.ts             # Pino structured logging
+├── i18n.ts               # Internationalization (ko, en)
+├── ai/                   # AI provider abstraction (OpenAI, Google) & settings
+├── auth/                 # Slack OTP + JWT authentication
+├── db/                   # Drizzle schema, pgvector similarity
+├── malts/                # Malt CRUD endpoints
+├── distill/              # Embedding generation pipeline
+├── cask/                 # Knowledge graph relationship extraction
+├── blend/                # Graph query & editing API
+├── search/               # Keyword & natural language search
+├── search-history/       # Search history tracking
+├── preferences/          # User preferences API
+├── pipeline/             # Dynamic scheduler, settings, progress tracking
+├── cron/                 # Scheduled backfill jobs
+└── graph/                # Neo4j driver & Cypher queries
 ```
 
 ---

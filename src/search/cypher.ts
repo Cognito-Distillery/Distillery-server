@@ -1,17 +1,17 @@
-import OpenAI from "openai";
+import { getChatProvider } from "../ai";
 import { logger } from "../logger";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export type QueryType = "structural" | "exploratory";
 
 export async function classifyQuery(
   query: string
 ): Promise<{ type: QueryType }> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const { provider, model } = await getChatProvider();
+
+  const content = await provider.chatCompletion({
+    model,
     temperature: 0,
-    response_format: { type: "json_object" },
+    responseFormat: "json",
     messages: [
       {
         role: "system",
@@ -25,9 +25,6 @@ Return JSON: { "type": "structural" | "exploratory" }`,
       { role: "user", content: query },
     ],
   });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) return { type: "exploratory" };
 
   try {
     const parsed = JSON.parse(content);
@@ -54,8 +51,10 @@ Full-text index "knowledge_text" on [summary, context, memo]
 `;
 
 export async function generateCypher(query: string): Promise<string> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+  const { provider, model } = await getChatProvider();
+
+  const content = await provider.chatCompletion({
+    model,
     temperature: 0,
     messages: [
       {
@@ -78,7 +77,6 @@ Rules:
     ],
   });
 
-  const content = response.choices[0]?.message?.content?.trim();
   if (!content) throw new Error("Empty Cypher response");
 
   // Strip markdown code fences if present

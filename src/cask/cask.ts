@@ -5,6 +5,7 @@ import { runQuery } from "../graph";
 import { RelationType, edgeCypher } from "../graph/schema";
 import { findSimilarCasked, findSimilarInBatch, type SimilarPair } from "../db/similarity";
 import { extractRelations, type RelationCandidate } from "./relationship";
+import { getPipelineSettings } from "../pipeline/settings-cache";
 import { logger } from "../logger";
 
 type DistilledMalt = {
@@ -45,7 +46,8 @@ export async function caskMalts() {
   }
 
   // Phase 2: 코사인 유사도 검색
-  const similarPairs = await findSimilarPairs(nodeCreated);
+  const settings = await getPipelineSettings();
+  const similarPairs = await findSimilarPairs(nodeCreated, settings.topK, settings.similarityThreshold);
 
   // Phase 3: AI 관계 추출
   const relations = await extractRelationsFromPairs(similarPairs, nodeCreated);
@@ -91,7 +93,9 @@ async function createKnowledgeNodes(
 
 // Phase 2
 async function findSimilarPairs(
-  items: DistilledMalt[]
+  items: DistilledMalt[],
+  topK: number,
+  threshold: number
 ): Promise<SimilarPair[]> {
   const withEmbedding = items.filter(
     (m): m is DistilledMalt & { embedding: number[] } => m.embedding !== null
@@ -106,7 +110,7 @@ async function findSimilarPairs(
   const caskedPairs: SimilarPair[] = [];
   for (const malt of withEmbedding) {
     try {
-      const similar = await findSimilarCasked(malt.id, malt.embedding);
+      const similar = await findSimilarCasked(malt.id, malt.embedding, topK, threshold);
       caskedPairs.push(...similar);
     } catch (err) {
       logger.warn({ err, maltId: malt.id }, "pgvector similarity search failed for malt");
@@ -115,7 +119,8 @@ async function findSimilarPairs(
 
   // 배치 내 상호 비교
   const batchPairs = findSimilarInBatch(
-    withEmbedding.map((m) => ({ id: m.id, embedding: m.embedding }))
+    withEmbedding.map((m) => ({ id: m.id, embedding: m.embedding })),
+    threshold
   );
 
   // 중복 제거 (sourceId-targetId 쌍 기준)

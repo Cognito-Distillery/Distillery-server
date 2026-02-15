@@ -6,6 +6,10 @@ import { authRoutes } from "./auth";
 import { maltRoutes } from "./malts";
 import { blendRoutes } from "./blend";
 import { searchRoutes } from "./search";
+import { preferencesRoutes } from "./preferences";
+import { searchHistoryRoutes } from "./search-history";
+import { aiSettingsRoutes } from "./ai/routes";
+import { pipelineRoutes, startScheduler } from "./pipeline";
 import { cronPlugin } from "./cron";
 import { initGraphSchema } from "./graph/schema";
 import { corsOrigins } from "./config";
@@ -51,6 +55,9 @@ const app = new Elysia()
           { name: "Search", description: "키워드 검색" },
           { name: "Malts", description: "몰트 관리" },
           { name: "Auth", description: "인증 (OTP / JWT)" },
+          { name: "Users", description: "유저 설정" },
+          { name: "Settings", description: "서버 설정 관리" },
+          { name: "Pipeline", description: "파이프라인 관리" },
         ],
       },
     })
@@ -90,6 +97,10 @@ const app = new Elysia()
   .use(maltRoutes)
   .use(blendRoutes)
   .use(searchRoutes)
+  .use(preferencesRoutes)
+  .use(searchHistoryRoutes)
+  .use(aiSettingsRoutes)
+  .use(pipelineRoutes)
   .get("/", () => "Hello Elysia")
   .listen(Number(process.env.PORT) || 8710);
 
@@ -98,3 +109,4 @@ logger.info(
 );
 
 initGraphSchema();
+startScheduler();

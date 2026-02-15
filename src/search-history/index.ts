@@ -1,0 +1,1 @@
+export { searchHistoryRoutes } from "./routes";
